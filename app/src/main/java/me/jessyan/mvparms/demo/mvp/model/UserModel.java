@@ -8,15 +8,16 @@ import java.util.List;
 
 import javax.inject.Inject;
 
-import io.rx_cache.DynamicKey;
-import io.rx_cache.EvictDynamicKey;
-import io.rx_cache.Reply;
+import io.reactivex.Observable;
+import io.reactivex.ObservableSource;
+import io.reactivex.annotations.NonNull;
+import io.reactivex.functions.Function;
+import io.rx_cache2.DynamicKey;
+import io.rx_cache2.EvictDynamicKey;
 import me.jessyan.mvparms.demo.mvp.contract.UserContract;
 import me.jessyan.mvparms.demo.mvp.model.api.cache.CommonCache;
 import me.jessyan.mvparms.demo.mvp.model.api.service.UserService;
 import me.jessyan.mvparms.demo.mvp.model.entity.User;
-import rx.Observable;
-import rx.functions.Func1;
 
 /**
  * Created by jess on 9/4/16 10:56
@@ -33,19 +34,21 @@ public class UserModel extends BaseModel implements UserContract.Model {
 
     @Override
     public Observable<List<User>> getUsers(int lastIdQueried, boolean update) {
-        Observable<List<User>> users = mRepositoryManager.obtainRetrofitService(UserService.class)
-                .getUsers(lastIdQueried, USERS_PER_PAGE);
         //使用rxcache缓存,上拉刷新则不读取缓存,加载更多读取缓存
-        return mRepositoryManager.obtainCacheService(CommonCache.class)
-                .getUsers(users
-                        , new DynamicKey(lastIdQueried)
-                        , new EvictDynamicKey(update))
-                .flatMap(new Func1<Reply<List<User>>, Observable<List<User>>>() {
+        return Observable.just(mRepositoryManager
+                .obtainRetrofitService(UserService.class)
+                .getUsers(lastIdQueried, USERS_PER_PAGE))
+                .flatMap(new Function<Observable<List<User>>, ObservableSource<List<User>>>() {
                     @Override
-                    public Observable<List<User>> call(Reply<List<User>> listReply) {
-                        return Observable.just(listReply.getData());
+                    public ObservableSource<List<User>> apply(@NonNull Observable<List<User>> listObservable) throws Exception {
+                        return mRepositoryManager.obtainCacheService(CommonCache.class)
+                                .getUsers(listObservable
+                                        , new DynamicKey(lastIdQueried)
+                                        , new EvictDynamicKey(update))
+                                .map(listReply -> listReply.getData());
                     }
                 });
+
     }
 
 }

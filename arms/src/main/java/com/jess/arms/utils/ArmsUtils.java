@@ -19,6 +19,10 @@ import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.jess.arms.base.App;
+import com.jess.arms.di.component.AppComponent;
+import com.jess.arms.integration.AppManager;
+
 import org.simple.eventbus.EventBus;
 
 import java.security.MessageDigest;
@@ -32,8 +36,13 @@ import static com.jess.arms.integration.AppManager.START_ACTIVITY;
 /**
  * Created by jess on 2015/11/23.
  */
-public class UiUtils {
+public class ArmsUtils {
     static public Toast mToast;
+
+
+    private ArmsUtils() {
+        throw new IllegalStateException("you can't instantiate me!");
+    }
 
     /**
      * 设置hint大小
@@ -199,7 +208,7 @@ public class UiUtils {
      *
      * @param text
      */
-    public static void SnackbarText(String text) {
+    public static void snackbarText(String text) {
         Message message = new Message();
         message.what = SHOW_SNACKBAR;
         message.obj = text;
@@ -212,7 +221,7 @@ public class UiUtils {
      *
      * @param text
      */
-    public static void SnackbarTextWithLong(String text) {
+    public static void snackbarTextWithLong(String text) {
         Message message = new Message();
         message.what = SHOW_SNACKBAR;
         message.obj = text;
@@ -231,19 +240,9 @@ public class UiUtils {
         return getResources(context).getDrawable(rID);
     }
 
-    /**
-     * 跳转界面
-     *
-     * @param activity
-     * @param homeActivityClass
-     */
-    public static void startActivity(Activity activity, Class homeActivityClass) {
-        Intent intent = new Intent(activity.getApplicationContext(), homeActivityClass);
-        activity.startActivity(intent);
-    }
 
     /**
-     * 跳转界面3
+     * 跳转界面 1 ,通过 {@link AppManager#startActivity(Class)}
      *
      * @param
      * @param homeActivityClass
@@ -256,7 +255,7 @@ public class UiUtils {
     }
 
     /**
-     * 跳转界面3
+     * 跳转界面 2 ,通过 {@link AppManager#startActivity(Intent)}
      *
      * @param
      */
@@ -267,8 +266,20 @@ public class UiUtils {
         EventBus.getDefault().post(message, APPMANAGER_MESSAGE);
     }
 
+
     /**
-     * 跳转界面4
+     * 跳转界面 3
+     *
+     * @param activity
+     * @param homeActivityClass
+     */
+    public static void startActivity(Activity activity, Class homeActivityClass) {
+        Intent intent = new Intent(activity.getApplicationContext(), homeActivityClass);
+        activity.startActivity(intent);
+    }
+
+    /**
+     * 跳转界面 4
      *
      * @param
      */
@@ -341,7 +352,7 @@ public class UiUtils {
      * @return
      * @throws Exception
      */
-    public static String MD5encode(String string) {
+    public static String encodeToMD5(String string) {
         byte[] hash = new byte[0];
         try {
             hash = MessageDigest.getInstance("MD5").digest(
@@ -399,6 +410,11 @@ public class UiUtils {
         Message message = new Message();
         message.what = APP_EXIT;
         EventBus.getDefault().post(message, APPMANAGER_MESSAGE);
+    }
+
+    public static AppComponent obtainAppComponentFromContext(Context context) {
+        Preconditions.checkState(context.getApplicationContext() instanceof App, "Application does not implements App");
+        return ((App) context.getApplicationContext()).getAppComponent();
     }
 
 }

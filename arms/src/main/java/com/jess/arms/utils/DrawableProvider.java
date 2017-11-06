@@ -14,6 +14,9 @@ import java.io.IOException;
  */
 public class DrawableProvider {
 
+    private DrawableProvider() {
+        throw new IllegalStateException("you can't instantiate me!");
+    }
 
     /**
      * 获得选择器

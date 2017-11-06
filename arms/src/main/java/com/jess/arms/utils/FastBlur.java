@@ -13,6 +13,10 @@ import android.view.View;
  */
 public class FastBlur {
 
+    private FastBlur() {
+        throw new IllegalStateException("you can't instantiate me!");
+    }
+
     public static Bitmap doBlur(Bitmap sentBitmap, int radius, boolean canReuseInBitmap) {
 
         // Stack Blur v1.0 from

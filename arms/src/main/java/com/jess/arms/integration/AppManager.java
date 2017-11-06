@@ -23,17 +23,18 @@ import javax.inject.Singleton;
 import timber.log.Timber;
 
 /**
- * 用于管理所有activity,和在前台的 activity
- * 可以通过直接持有AppManager对象执行对应方法
- * 也可以通过eventbus post事件,远程遥控执行对应方法
+ * 用于管理所有 activity,和在前台的 activity
+ * 可以通过直接持有 AppManager 对象执行对应方法
+ * 也可以通过 eventbus post 事件,远程遥控执行对应方法
+ * <p>
  * Created by jess on 14/12/2016 13:50
  * Contact with jess.yan.effort@gmail.com
  */
 @Singleton
-public class AppManager {
+public final class AppManager {
     protected final String TAG = this.getClass().getSimpleName();
     public static final String APPMANAGER_MESSAGE = "appmanager_message";
-    public static final String IS_NOT_ADD_ACTIVITY_LIST = "is_add_activity_list";//是否加入到activity的list，管理
+    public static final String IS_NOT_ADD_ACTIVITY_LIST = "is_not_add_activity_list";//true 为不需要加入到 Activity 容器进行统一管理,反之亦然
     public static final int START_ACTIVITY = 0;
     public static final int SHOW_SNACKBAR = 1;
     public static final int KILL_ALL = 2;
@@ -53,7 +54,7 @@ public class AppManager {
 
 
     /**
-     * 通过eventbus post事件,远程遥控执行对应方法
+     * 通过 eventbus post 事件,远程遥控执行对应方法
      */
     @Subscriber(tag = APPMANAGER_MESSAGE, mode = ThreadMode.MAIN)
     public void onReceive(Message message) {
@@ -72,7 +73,10 @@ public class AppManager {
                 killAll();
                 break;
             case APP_EXIT:
-                AppExit();
+                appExit();
+                break;
+            default:
+                Timber.tag(TAG).w("The message.what not match");
                 break;
         }
     }
@@ -82,12 +86,11 @@ public class AppManager {
             startActivity((Intent) message.obj);
         else if (message.obj instanceof Class)
             startActivity((Class) message.obj);
-        return;
     }
 
 
     /**
-     * 使用snackbar显示内容
+     * 让在前台的 activity,使用 snackbar 显示文本内容
      *
      * @param message
      * @param isLong
@@ -103,23 +106,23 @@ public class AppManager {
 
 
     /**
-     * 让在前台的activity,打开下一个activity
+     * 让在栈顶的 activity ,打开指定的 activity
      *
      * @param intent
      */
     public void startActivity(Intent intent) {
-        if (getCurrentActivity() == null) {
+        if (getTopActivity() == null) {
             Timber.tag(TAG).w("mCurrentActivity == null when startActivity(Intent)");
             //如果没有前台的activity就使用new_task模式启动activity
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             mApplication.startActivity(intent);
             return;
         }
-        getCurrentActivity().startActivity(intent);
+        getTopActivity().startActivity(intent);
     }
 
     /**
-     * 让在前台的activity,打开下一个activity
+     * 让在栈顶的 activity ,打开指定的 activity
      *
      * @param activityClass
      */
@@ -139,7 +142,10 @@ public class AppManager {
     }
 
     /**
-     * 将在前台的activity保存
+     * 将在前台的 activity 赋值给 currentActivity,注意此方法是在 onResume 方法执行时将栈顶的 activity 赋值给 currentActivity
+     * 所以在栈顶的 activity 执行 onCreate 方法时使用 {@link #getCurrentActivity()} 获取的就不是当前栈顶的 activity,可能是上一个 activity
+     * 如果在 App 的第一个 activity 执行 onCreate 方法时使用 {@link #getCurrentActivity()} 则会出现返回为 null 的情况
+     * 想避免这种情况请使用 {@link #getTopActivity()}
      *
      * @param currentActivity
      */
@@ -148,16 +154,38 @@ public class AppManager {
     }
 
     /**
-     * 获得当前在前台的activity
+     * 获取在前台的 activity (保证获取到的 activity 正处于可见状态,即未调用 onStop),获取的 activity 存续时间
+     * 是在 onStop 之前,所以如果当此 activity 调用 onStop 方法之后,没有其他的 activity 回到前台(用户返回桌面或者打开了其他 App 会出现此状况)
+     * 这时调用 {@link #getCurrentActivity()} 有可能返回 null,所以请注意使用场景和 {@link #getTopActivity()} 不一样
+     * <p>
+     * Example usage:
+     * 使用场景比较适合,只需要在可见状态的 activity 上执行的操作
+     * 如当后台 service 执行某个任务时,需要让前台 activity ,做出某种响应操作或其他操作,如弹出 Dialog,这时在 service 中就可以使用 {@link #getCurrentActivity()}
+     * 如果返回为 null ,说明没有前台 activity (用户返回桌面或者打开了其他 App 会出现此状况),则不做任何操作,不为 null ,则弹出 Dialog
      *
      * @return
      */
     public Activity getCurrentActivity() {
-        return mCurrentActivity;
+        return mCurrentActivity != null ? mCurrentActivity : null;
     }
 
     /**
-     * 返回一个存储所有未销毁的activity的集合
+     * 获取位于栈顶的 activity,此方法不保证获取到的 acticity 正处于可见状态,即使 App 进入后台也会返回当前栈顶的 activity
+     * 因此基本不会出现 null 的情况,比较适合大部分的使用场景,如 startActivity,Glide 加载图片
+     *
+     * @return
+     */
+    public Activity getTopActivity() {
+        if (mActivityList == null) {
+            Timber.tag(TAG).w("mActivityList == null when getTopActivity()");
+            return null;
+        }
+        return mActivityList.size() > 0 ? mActivityList.get(mActivityList.size() - 1) : null;
+    }
+
+
+    /**
+     * 返回一个存储所有未销毁的 activity 的集合
      *
      * @return
      */
@@ -170,7 +198,7 @@ public class AppManager {
 
 
     /**
-     * 添加Activity到集合
+     * 添加 activity 到集合
      */
     public void addActivity(Activity activity) {
         if (mActivityList == null) {
@@ -184,7 +212,7 @@ public class AppManager {
     }
 
     /**
-     * 删除集合里的指定activity
+     * 删除集合里的指定的 activity 实例
      *
      * @param activity
      */
@@ -201,7 +229,7 @@ public class AppManager {
     }
 
     /**
-     * 删除集合里的指定位置的activity
+     * 删除集合里的指定位置的 activity
      *
      * @param location
      */
@@ -219,13 +247,13 @@ public class AppManager {
     }
 
     /**
-     * 关闭指定activity
+     * 关闭指定的 activity class 的所有的实例
      *
      * @param activityClass
      */
     public void killActivity(Class<?> activityClass) {
         if (mActivityList == null) {
-            Timber.tag(TAG).w("mActivityList == null when killActivity");
+            Timber.tag(TAG).w("mActivityList == null when killActivity(Class)");
             return;
         }
         for (Activity activity : mActivityList) {
@@ -237,14 +265,14 @@ public class AppManager {
 
 
     /**
-     * 指定的activity实例是否存活
+     * 指定的 activity 实例是否存活
      *
      * @param activity
      * @return
      */
     public boolean activityInstanceIsLive(Activity activity) {
         if (mActivityList == null) {
-            Timber.tag(TAG).w("mActivityList == null when activityInstanceIsLive");
+            Timber.tag(TAG).w("mActivityList == null when activityInstanceIsLive(Activity)");
             return false;
         }
         return mActivityList.contains(activity);
@@ -252,14 +280,14 @@ public class AppManager {
 
 
     /**
-     * 指定的activity class是否存活(一个activity可能有多个实例)
+     * 指定的 activity class 是否存活(同一个 activity class 可能有多个实例)
      *
      * @param activityClass
      * @return
      */
     public boolean activityClassIsLive(Class<?> activityClass) {
         if (mActivityList == null) {
-            Timber.tag(TAG).w("mActivityList == null when activityClassIsLive");
+            Timber.tag(TAG).w("mActivityList == null when activityClassIsLive(Class)");
             return false;
         }
         for (Activity activity : mActivityList) {
@@ -267,13 +295,32 @@ public class AppManager {
                 return true;
             }
         }
-
         return false;
     }
 
 
     /**
-     * 关闭所有activity
+     * 获取指定 activity class 的实例,没有则返回 null(同一个 activity class 有多个实例,则返回最早的实例)
+     *
+     * @param activityClass
+     * @return
+     */
+    public Activity findActivity(Class<?> activityClass) {
+        if (mActivityList == null) {
+            Timber.tag(TAG).w("mActivityList == null when findActivity(Class)");
+            return null;
+        }
+        for (Activity activity : mActivityList) {
+            if (activity.getClass().equals(activityClass)) {
+                return activity;
+            }
+        }
+        return null;
+    }
+
+
+    /**
+     * 关闭所有 activity
      */
     public void killAll() {
 //        while (getActivityList().size() != 0) { //此方法只能兼容LinkedList
@@ -282,8 +329,9 @@ public class AppManager {
 
         Iterator<Activity> iterator = getActivityList().iterator();
         while (iterator.hasNext()) {
-            iterator.next().finish();
+            Activity next = iterator.next();
             iterator.remove();
+            next.finish();
         }
 
     }
@@ -292,11 +340,10 @@ public class AppManager {
     /**
      * 退出应用程序
      */
-    public void AppExit() {
+    public void appExit() {
         try {
             killAll();
-            if (mActivityList != null)
-                mActivityList = null;
+            release();
             ActivityManager activityMgr =
                     (ActivityManager) mApplication.getSystemService(Context.ACTIVITY_SERVICE);
             activityMgr.killBackgroundProcesses(mApplication.getPackageName());

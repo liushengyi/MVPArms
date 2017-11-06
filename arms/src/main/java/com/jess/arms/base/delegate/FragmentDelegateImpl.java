@@ -7,7 +7,7 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.view.View;
 
-import com.jess.arms.base.App;
+import com.jess.arms.utils.ArmsUtils;
 
 import org.simple.eventbus.EventBus;
 
@@ -40,7 +40,9 @@ public class FragmentDelegateImpl implements FragmentDelegate {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-
+        if (iFragment.useEventBus())//如果要使用eventbus请将此方法返回true
+            EventBus.getDefault().register(mFragment);//注册到事件主线
+        iFragment.setupFragmentComponent(ArmsUtils.obtainAppComponentFromContext(mFragment.getActivity()));
     }
 
     @Override
@@ -52,10 +54,7 @@ public class FragmentDelegateImpl implements FragmentDelegate {
 
     @Override
     public void onActivityCreate(Bundle savedInstanceState) {
-        if (iFragment.useEventBus())//如果要使用eventbus请将此方法返回true
-            EventBus.getDefault().register(mFragment);//注册到事件主线
-        iFragment.setupFragmentComponent(((App) mFragment.getActivity().getApplication()).getAppComponent());
-        iFragment.initData();
+        iFragment.initData(savedInstanceState);
     }
 
     @Override
@@ -98,7 +97,7 @@ public class FragmentDelegateImpl implements FragmentDelegate {
 
     @Override
     public void onDestroy() {
-        if (iFragment.useEventBus())//如果要使用eventbus请将此方法返回true
+        if (iFragment != null && iFragment.useEventBus())//如果要使用eventbus请将此方法返回true
             EventBus.getDefault().unregister(mFragment);//注册到事件主线
         this.mUnbinder = null;
         this.mFragmentManager = null;
@@ -109,6 +108,14 @@ public class FragmentDelegateImpl implements FragmentDelegate {
     @Override
     public void onDetach() {
 
+    }
+
+    /**
+     * Return true if the fragment is currently added to its activity.
+     */
+    @Override
+    public boolean isAdded() {
+        return mFragment == null ? false : mFragment.isAdded();
     }
 
     @Override

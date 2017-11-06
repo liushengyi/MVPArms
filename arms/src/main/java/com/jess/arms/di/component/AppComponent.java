@@ -9,7 +9,7 @@ import com.jess.arms.di.module.ClientModule;
 import com.jess.arms.di.module.GlobalConfigModule;
 import com.jess.arms.integration.AppManager;
 import com.jess.arms.integration.IRepositoryManager;
-import com.jess.arms.widget.imageloader.ImageLoader;
+import com.jess.arms.http.imageloader.ImageLoader;
 
 import java.io.File;
 import java.util.Map;
@@ -26,7 +26,7 @@ import okhttp3.OkHttpClient;
 @Singleton
 @Component(modules = {AppModule.class, ClientModule.class, GlobalConfigModule.class})
 public interface AppComponent {
-    Application Application();
+    Application application();
 
     //用于管理网络请求层,以及数据缓存层
     IRepositoryManager repositoryManager();
